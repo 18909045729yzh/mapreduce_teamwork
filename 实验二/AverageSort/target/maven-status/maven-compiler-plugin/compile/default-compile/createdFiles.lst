@@ -1,0 +1,4 @@
+SortMapper.class
+SortReducer.class
+DescendingDoubleComparator.class
+AverageSorter.class

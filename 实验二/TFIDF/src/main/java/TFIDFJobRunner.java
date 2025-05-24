@@ -1,0 +1,60 @@
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class TFIDFJobRunner {
+    public static void main(String[] args) throws Exception {
+        if (args.length != 2) {
+            System.err.println("Usage: TFIDFJobRunner <input path> <output path>");
+            System.exit(-1);
+        }
+
+        try {
+            // 初始化配置
+            Configuration conf = new Configuration();
+
+            // 递归统计文档总数
+            Path inputPath = new Path(args[0]);
+            FileSystem fs = inputPath.getFileSystem(conf);
+            RemoteIterator<LocatedFileStatus> fileIterator = fs.listFiles(inputPath, true); // true 表示递归
+            int docCount = 0;
+            while (fileIterator.hasNext()) {
+                LocatedFileStatus fileStatus = fileIterator.next();
+                if (fileStatus.isFile()) {
+                    docCount++;
+                }
+            }
+
+            // 设置到配置中
+            conf.setInt("docCount", docCount);
+
+            // 设置 MapReduce Job
+            Job job = Job.getInstance(conf, "TF-IDF");
+
+            job.setJarByClass(TFIDFJobRunner.class);
+            job.setMapperClass(TFMapper.class);
+            job.setReducerClass(TFIDFReducer.class);
+
+            job.setOutputKeyClass(Text.class);
+            job.setOutputValueClass(Text.class);
+            job.setInputFormatClass(TextInputFormat.class);
+
+            FileInputFormat.addInputPath(job, inputPath);
+            FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+            System.exit(job.waitForCompletion(true) ? 0 : 1);
+        } catch (IOException | InterruptedException | ClassNotFoundException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+}
